@@ -1,3 +1,25 @@
+Backtrader (Grenite Fork)
+==========
+This fork made one minor change to its Interactive Brokers API where you can use the delayed (and free!) data feed to paper trade your algorithms without use of a premium subscription.
+During instanciation of an IBstore or IBdata class, an extra parameter *reqDataType* can be passed, for example:
+::
+   ibstore = backtrader.stores.IBStore(...)
+   datafeed = ibstore.getData(
+              dataname='SPY-STK-AMEX-USED'
+              .
+              .
+              .
+              reqDataType=3 #The new parameter in question 3 is delayed data
+              )
+And that is all (for now?) so here are some extra docs that might come in handy
+
+Building
+**********************
+In the root folder of the cloned repo:
+::
+   pip install .
+Make sure you have installed all the dependencies required for the original backtrader installation.
+   
 backtrader
 ==========
 

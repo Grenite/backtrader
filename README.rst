@@ -9,7 +9,7 @@ During instanciation of an IBstore or IBdata class, an extra parameter *reqDataT
               .
               .
               .
-              reqDataType=3 #The new parameter in question 3 is delayed data
+              reqDataType=3 #The new parameter in question here is requesting delayed data
               )
 And that is all (for now?) so here are some extra docs that might come in handy
 

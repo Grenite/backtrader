@@ -839,6 +839,9 @@ class IBStore(with_metaclass(MetaSingleton, object)):
 
             self.cancelQueue(q, True)
 
+    def reqMarketDataType(self, datatype = 1):
+        self.conn.reqMarketDataType(datatype)
+
     def reqMktData(self, contract, what=None):
         '''Creates a MarketData subscription
 

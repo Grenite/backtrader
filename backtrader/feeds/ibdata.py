@@ -178,6 +178,12 @@ class IBData(with_metaclass(MetaIBData, DataBase)):
         - SPY-CFD-SMART-USD -> which is the corresponding CFD which offers not
           price tracking but in this case will be the trading asset (specified
           as ``tradename``)
+          
+      - ``reqDataType`` (default: 1)
+          Sets the market data type returned by reqMktData by calling reqMarketDataType, 
+          to live(1), frozen(2), delayed(3) or delayed-frozen(4).
+          Live and frozen require a paid subscription while delayed and delayed-frozen 
+          are free, but have a 15 minute delay in data returned
 
     The default values in the params are the to allow things like ```TICKER``,
     to which the parameter ``sectype`` (default: ``STK``) and ``exchange``
@@ -206,6 +212,7 @@ class IBData(with_metaclass(MetaIBData, DataBase)):
         ('backfill_from', None),  # additional data source to do backfill from
         ('latethrough', False),  # let late samples through
         ('tradename', None),  # use a different asset as order target
+        ('reqDataType', 1)
     )
 
     _store = ibstore.IBStore
@@ -340,8 +347,8 @@ class IBData(with_metaclass(MetaIBData, DataBase)):
         return precon
 
     def start(self):
-        '''Starts the IB connecction and gets the real contract and
-        contractdetails if it exists'''
+        '''Starts the IB connecction, gets the real contract and
+        contractdetails if it exists and set the request market data type (premium live or free delayed)'''
         super(IBData, self).start()
         # Kickstart store and get queue to wait on
         self.qlive = self.ib.start(data=self)
@@ -399,7 +406,8 @@ class IBData(with_metaclass(MetaIBData, DataBase)):
                 # no contract can be found (or many)
                 self.put_notification(self.DISCONNECTED)
                 return
-
+            
+        self.ib.reqMarketDataType(self.params.reqDataType)
         if self._state == self._ST_START:
             self._start_finish()  # to finish initialization
             self._st_start()

@@ -19,6 +19,10 @@ In the root folder of the cloned repo:
 ::
    pip install .
 Make sure you have installed all the dependencies required for the original backtrader installation.
+
+Historical Data/Backfilling limitations
+**********************
+Unfortunately historical data is not free even with the delayed data subscription. You will need to get your historical data from another source for backfilling purposes using the backfill_from attribute
    
 backtrader
 ==========

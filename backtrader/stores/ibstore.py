@@ -50,6 +50,55 @@ def _ts2dt(tstamp=None):
     usec = msec * 1000
     return datetime.utcfromtimestamp(sec).replace(microsecond=usec)
 
+class DelayedData(object):
+    _fields = [
+        ('datetime', datetime.utcfromtimestamp),
+        ('bid', float),
+        ('ask', float),
+        ('last', float),
+        ('bidsize', int),
+        ('asksize', int),
+        ('lastsize', int),
+        ('high', float),
+        ('low', float),
+        ('volume', int),
+        ('close', float),
+        ('open', float),
+        ('price', float),
+        ('size', int)
+    ]
+    def __init__(self):
+        self.dict = {}
+        for name, func in self._fields:
+            self.dict.setdefault(name, func)
+            setattr(self, name, func(-1))
+        self._idMap = {
+            88: 'datetime',
+            66: 'bid',
+            67: 'ask',
+            68: 'last',
+            69: 'bidsize',
+            70: 'asksize',
+            71: 'lastsize',
+            72: 'high',
+            73: 'low',
+            74: 'volume',
+            75: 'close',
+            76: 'open'
+        }
+    def setAttribute(self, tickId, value):
+        setattr(self, self._idMap[tickId], self.dict[self._idMap[tickId]](value))
+        if (tickId == 68):
+            setattr(self, 'price', self.dict[self._idMap[68]](value))
+        elif (tickId == 74):
+            setattr(self, 'size', self.dict[self._idMap[74]](value))
+    def isComplete(self): #66 67 68 72 73 75 
+        for name, func in self._fields:
+            if name in ['open', 'asksize', 'bidsize', 'lastsize']: #open is not implement in delayed data in Interactive Brokers api
+                continue
+            if (getattr(self, name) == -1):
+                return False
+        return True
 
 class RTVolume(object):
     '''Parses a tickString tickType 48 (RTVolume) event from the IB API into its
@@ -244,6 +293,8 @@ class IBStore(with_metaclass(MetaSingleton, object)):
         self.managed_accounts = list()  # received via managedAccounts
 
         self.notifs = queue.Queue()  # store notifications for cerebro
+
+        self._delayedData = collections.OrderedDict() # temporary buffer to store delayed data before insertion into queue
 
         # Use the provided clientId or a random one
         if self.p.clientId is None:
@@ -891,6 +942,14 @@ class IBStore(with_metaclass(MetaSingleton, object)):
                 # Don't need to adjust the time, because it is in "timestamp"
                 # form in the message
                 self.qs[msg.tickerId].put(rtvol)
+        elif msg.tickType == 88:
+            if msg.tickerId not in self._delayedData:
+                self._delayedData[msg.tickerId] = DelayedData()
+            dataObj = self._delayedData[msg.tickerId]
+            dataObj.setAttribute(msg.tickType, int(msg.value))
+            if (dataObj.isComplete()):
+                self.qs[msg.tickerId].put(dataObj)
+                self._delayedData[msg.tickerId] = DelayedData()
 
     @ibregister
     def tickPrice(self, msg):
@@ -923,7 +982,25 @@ class IBStore(with_metaclass(MetaSingleton, object)):
                     pass
                 else:
                     self.qs[tickerId].put(rtvol)
-
+        elif msg.field in [66, 67, 68, 72, 73, 75, 76]:
+            if tickerId not in self._delayedData:
+                self._delayedData[tickerId] = DelayedData()
+            dataObj = self._delayedData[tickerId]
+            dataObj.setAttribute(msg.field, msg.price)
+            if (dataObj.isComplete()):
+                self.qs[tickerId].put(dataObj)
+                self._delayedData[tickerId] = DelayedData()
+    @ibregister
+    def tickSize(self, msg):
+        tickerId = msg.tickerId
+        if msg.field in [69, 70, 71, 74]:
+            if tickerId not in self._delayedData:
+                self._delayedData[tickerId] = DelayedData()
+            dataObj = self._delayedData[tickerId]
+            dataObj.setAttribute(msg.field, msg.size)
+            if (dataObj.isComplete()):
+                self.qs[tickerId].put(dataObj)
+                self._delayedData[tickerId] = DelayedData()
     @ibregister
     def realtimeBar(self, msg):
         '''Receives x seconds Real Time Bars (at the time of writing only 5
